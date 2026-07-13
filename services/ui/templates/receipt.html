@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>Order Confirmed</title></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 40px auto;">
+  <h1>Order Confirmed</h1>
+  <p>Order ID: {{ order.order_id }}</p>
+  <p>Total: ${{ order.total }}</p>
+  <ul>
+    {% for item in order.line_items %}
+      <li>{{ item.name }} x{{ item.qty }} - ${{ item.subtotal }}</li>
+    {% endfor %}
+  </ul>
+  <a href="/">Back to store</a>
+</body>
+</html>

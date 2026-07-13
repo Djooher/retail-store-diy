@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><title>DIY Retail Store</title></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 40px auto;">
+  <h1>My Retail Store</h1>
+  <h2>Products</h2>
+  {% for p in products %}
+    <div style="border:1px solid #ccc; padding:10px; margin-bottom:8px;">
+      <b>{{ p.name }}</b> - ${{ p.price }}
+      <form action="/add/{{ p.id }}" method="post" style="display:inline;">
+        <button type="submit">Add to cart</button>
+      </form>
+    </div>
+  {% endfor %}
+
+  <h2>Cart ({{ cart|length }} items)</h2>
+  {% for item in cart %}
+    <p>Product #{{ item.product_id }} x{{ item.qty }}</p>
+  {% endfor %}
+
+  <form action="/checkout" method="post">
+    <button type="submit">Checkout</button>
+  </form>
+</body>
+</html>
