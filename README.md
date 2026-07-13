@@ -1,258 +1,521 @@
-# Retail Store Microservices Application
+#  Retail Store Microservices - Cloud Native DevOps Project
 
-A cloud-native retail store application built using a **microservices architecture**.
-The project demonstrates containerization, service communication, Kubernetes deployment, and DevOps practices.
+##  Project Overview
 
-##  Architecture Overview
+This project demonstrates how a traditional online store application can be transformed into a **cloud-native microservices application** using modern DevOps practices.
 
-The application is composed of multiple independent services:
+The goal is not only to run an application, but to understand how real companies build, package, deploy, update, and manage applications at scale.
 
-* **UI Service** → Frontend web interface
-* **Catalog Service** → Product catalog management
-* **Cart Service** → Shopping cart management
-* **Checkout Service** → Checkout process
-* **Orders Service** → Order processing
+The project covers:
 
-Each service runs inside its own container and communicates with other services through internal networking.
+* Microservices architecture
+* Docker containerization
+* Kubernetes orchestration
+* CI/CD automation
+* GitOps deployment with ArgoCD
 
-##  Tech Stack
+---
 
-### Application
+#  Application Architecture
 
-* Python Flask
-* HTML/CSS/JavaScript
+A retail store application usually contains multiple functionalities:
 
-### Containers
+* User interface
+* Product catalog
+* Shopping cart
+* Checkout process
+* Order management
 
-* Docker
-* Docker Compose (local testing)
+Instead of building everything as one large application, we split it into independent services.
 
-### Kubernetes
+## Before: Monolithic Architecture
 
-* Kubernetes Deployments
-* Services
-* ConfigMaps
-* Secrets
-* Probes (liveness/readiness)
-* Resource requests and limits
-
-### DevOps Tools
-
-* Git & GitHub
-* GitHub Actions CI/CD
-* ArgoCD GitOps deployment
-
-##  Project Structure
+A traditional application could look like this:
 
 ```
+                Retail Store Application
+
+                       |
+        ---------------------------------
+        |        |        |             |
+       UI      Cart    Checkout      Orders
+```
+
+All features are inside one application.
+
+### Problems:
+
+* A bug in one feature can affect the entire application
+* Updating one part requires redeploying everything
+* Scaling specific features is difficult
+
+---
+
+# After: Microservices Architecture
+
+The application is divided into independent services:
+
+```
+                  Retail Store
+
+                      |
+ ------------------------------------------------
+ |          |          |          |              |
+UI       Catalog      Cart     Checkout       Orders
+```
+
+Each service:
+
+* Has its own source code
+* Has its own Docker image
+* Can be deployed independently
+* Can be scaled independently
+
+Example:
+
+If the checkout service has a problem:
+
+```
+Checkout Service 
+
+Catalog Service 
+Cart Service 
+Orders Service 
+```
+
+The entire application does not need to stop.
+
+---
+
+# Project Structure
+```
 retail-store-final/
+
 │
 ├── services/
+│   ├── ui/
 │   ├── cart/
-│   │   ├── app.py
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
-│   │
 │   ├── catalog/
 │   ├── checkout/
-│   ├── orders/
-│   └── ui/
+│   └── orders/
 │
 ├── k8s/
 │   ├── namespace.yaml
+│   ├── ui.yaml
 │   ├── cart.yaml
 │   ├── catalog.yaml
 │   ├── checkout.yaml
-│   ├── orders.yaml
-│   └── ui.yaml
+│   └── orders.yaml
 │
 ├── argocd/
 │   └── application.yaml
 │
-├── kind-config.yaml
 └── README.md
 ```
 
-# Running Locally With Docker
+---
 
-## 1. Create Docker Network
+#  Docker: Packaging Each Service
 
-```bash
-docker network create retail-net
+Docker allows each service to run in an isolated environment.
+
+A Docker image contains:
+
 ```
-
-## 2. Build Images
+Application Code
+        +
+Dependencies
+        +
+Runtime Environment
+        |
+        |
+     Docker Image
+        |
+        |
+     Container
+```
 
 Example:
 
-```bash
-docker build -t catalog ./services/catalog
-docker build -t cart ./services/cart
-docker build -t checkout ./services/checkout
-docker build -t orders ./services/orders
-docker build -t ui ./services/ui
+The catalog service becomes:
+
+```
+catalog:v1
+
+Contains:
+- Python
+- Flask
+- Catalog code
+- Required libraries
 ```
 
-## 3. Run Containers
+When Docker runs the image, it creates a container.
+
+---
+
+#  Container Communication
+
+Although services are separated, they still need to communicate.
 
 Example:
 
-```bash
-docker run -d \
---name catalog \
---network retail-net \
--p 5002:5000 \
-catalog
+```
+User
+
+ |
+ |
+UI Container
+
+ |
+ |
+Checkout Container
+
+ |
+ |
+Cart Container
+
+ |
+ |
+Orders Container
 ```
 
-Repeat for other services.
+Docker networking allows containers to find each other.
 
-Check running containers:
-
-```bash
-docker ps
-```
-
-## 4. Access Application
-
-Open:
+Instead of using IP addresses:
 
 ```
-http://localhost:8080
+localhost:5000
 ```
 
-##  Kubernetes Deployment
+services communicate using names:
 
-## 1. Create Namespace
-
-```bash
-kubectl apply -f k8s/namespace.yaml
+```
+catalog:5000
+cart:5000
+orders:5000
 ```
 
-## 2. Deploy Services
+Docker DNS automatically resolves these names.
 
-```bash
-kubectl apply -f k8s/
+---
+
+#  Why Kubernetes?
+
+Docker can run containers, but managing many containers manually becomes difficult.
+
+Imagine having:
+
+```
+50 containers
 ```
 
-Check pods:
+Who will:
 
-```bash
-kubectl get pods -n retail
+* Restart failed containers?
+* Create new containers?
+* Scale applications?
+* Update versions?
+* Distribute traffic?
+
+Kubernetes solves these problems.
+
+---
+
+# Kubernetes Responsibilities
+
+## 1. Self-Healing
+
+If a container crashes:
+
+```
+Application Pod 
+
+Kubernetes:
+
+Create a new Pod 
 ```
 
-Check services:
+---
 
-```bash
-kubectl get svc -n retail
+## 2. Scaling
+
+Example:
+
+High traffic on catalog service:
+
+Before:
+
+```
+Catalog
+
+1 Pod
 ```
 
-##  CI/CD Pipeline
+After:
 
-The project follows a modern DevOps workflow:
+```
+Catalog
+
+Pod 1
+Pod 2
+Pod 3
+```
+
+Only the required service is scaled.
+
+---
+
+## 3. Deployment Management
+
+Kubernetes manages application versions.
+
+Example:
+
+Old version:
+
+```
+catalog:v1
+```
+
+New version:
+
+```
+catalog:v2
+```
+
+Kubernetes gradually replaces old containers with new ones.
+
+---
+
+# Kubernetes YAML Files
+
+The YAML files describe what Kubernetes should create.
+
+Example:
+
+```
+catalog.yaml
+```
+
+tells Kubernetes:
+
+* Which Docker image to use
+* How many replicas are needed
+* Which ports are open
+* Resource limits
+* Health checks
+
+---
+
+#  CI/CD Pipeline
+
+CI/CD means automatically building, testing, and deploying application changes.
+
+The workflow:
+
+```
+Developer
+
+    |
+    |
+Writes Code
+
+    |
+    |
+GitHub Repository
+
+    |
+    |
+GitHub Actions
+
+    |
+    |
+Build Docker Image
+
+    |
+    |
+Push Image to Registry
+
+    |
+    |
+Deploy New Version
+
+    |
+    |
+Kubernetes Cluster
+```
+
+---
+
+# ⚙️ GitHub Actions
+
+GitHub Actions acts like a robot.
+
+When code changes are pushed:
+
+It automatically:
+
+1. Downloads the new code
+2. Builds Docker images
+3. Runs tests
+4. Pushes images to a container registry
+5. Deploys the new version
+
+Example:
+
+Before:
+
+```
+catalog:v1
+```
+
+After a code update:
+
+```
+catalog:v2
+```
+
+---
+
+# Important: CI/CD Does Not Mean No Bugs
+
+CI/CD automates the process, but it cannot guarantee perfect code.
+
+It can:
+
+ Build applications automatically
+ Run automated tests
+ Deploy changes faster
+
+But problems can still happen because of:
+
+* Programming errors
+* Database issues
+* Configuration mistakes
+
+That is why production systems also use:
+
+* Monitoring
+* Logging
+* Alerts
+
+---
+
+# 🚀 GitOps with ArgoCD
+
+ArgoCD introduces a GitOps workflow.
+
+Instead of manually deploying applications:
+
+```
+Developer
+
+   |
+   |
+GitHub
+
+   |
+   |
+ArgoCD
+
+   |
+   |
+Kubernetes
+```
+
+ArgoCD continuously watches the Git repository.
+
+If the desired state changes in Git:
+
+Example:
+
+```
+image: catalog:v2
+```
+
+ArgoCD updates Kubernetes automatically.
+
+---
+
+# Complete Project Workflow
 
 ```
 Developer
     |
-    v
+    |
+Git Push
+    |
+    |
 GitHub Repository
     |
-    v
+    |
 GitHub Actions
     |
-    v
+    |
 Docker Image Build
     |
-    v
+    |
 Container Registry
     |
-    v
+    |
 ArgoCD
     |
-    v
+    |
 Kubernetes Cluster
+    |
+    |
+Running Application
 ```
 
-##  Kubernetes Features Used
+---
 
-### Deployments
+# 🎯 What This Project Teaches
 
-Provide:
+After completing this project, you understand:
 
-* Scaling
-* Self-healing
-* Rolling updates
+## Application Architecture
 
-Example:
+✅ Microservices
+✅ Service communication
+✅ Independent deployments
 
-```yaml
-replicas: 3
-```
+## Containers
 
-### Readiness Probe
+✅ Docker images
+✅ Docker containers
+✅ Container networking
 
-Checks if the application is ready to receive traffic.
+## Kubernetes
 
-### Liveness Probe
+✅ Pods
+✅ Deployments
+✅ Services
+✅ Scaling
+✅ Self-healing
 
-Restarts unhealthy containers automatically.
+## DevOps
 
-### Resource Management
+✅ CI/CD pipelines
+✅ Automated deployments
+✅ GitOps with ArgoCD
 
-Containers have CPU and memory limits:
+---
 
-```yaml
-resources:
-  requests:
-    cpu: "100m"
-    memory: "128Mi"
-  limits:
-    cpu: "500m"
-    memory: "512Mi"
-```
+# Future Improvements
 
-## Troubleshooting
+Possible improvements:
 
-### Check Logs
+* Add Terraform for Infrastructure as Code
+* Deploy on Azure Kubernetes Service (AKS)
+* Add Prometheus and Grafana monitoring
+* Add NGINX Ingress Controller
+* Add automated testing
+* Add security scanning for Docker images
 
-```bash
-docker logs <container-name>
-```
+---
 
-or Kubernetes:
-
-```bash
-kubectl logs <pod-name> -n retail
-```
-
-### Enter Container
-
-```bash
-docker exec -it <container-name> bash
-```
-
-### Test Service Communication
-
-Example:
-
-```bash
-curl http://catalog:5000/catalog
-```
-
-##  Project Goals
-
-This project demonstrates:
-
- Microservices architecture
- Docker containerization
- Kubernetes orchestration
- Service discovery
- CI/CD automation
- GitOps deployment using ArgoCD
- Cloud-native application practices
-
-##  Author
+# Author
 
 Hadjer Boubegra (Djo)
 
-Cloud / DevOps Engineering Project
+Cloud / DevOps Learning Project
